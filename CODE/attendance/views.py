@@ -71,7 +71,9 @@ def create_session(request):
         title = request.POST.get('title')
         location = request.POST.get('location', '')
         duration_minutes = int(request.POST.get('duration', 60))
+        
         course = get_object_or_404(Course, id=course_id, teacher=request.user)
+        
         # Create session
         start_time = timezone.now()
         end_time = start_time + timedelta(minutes=duration_minutes)
@@ -105,10 +107,12 @@ def session_detail(request, session_id):
     if not request.user.is_teacher() or session.teacher != request.user:
         messages.error(request, 'Access denied.')
         return redirect('attendance:dashboard')
+    
     # Get attendance records
     attendance_records = AttendanceRecord.objects.filter(
         session=session
     ).select_related('student').order_by('-marked_at')
+    
     # Generate QR code URL
     qr_url = request.build_absolute_uri(
         reverse('attendance:mark_attendance', kwargs={
@@ -325,6 +329,11 @@ def admin_dashboard(request):
     total_students = request.user.__class__.objects.filter(role='student').count()
     total_teachers = request.user.__class__.objects.filter(role='teacher').count()
     
+    # Get subnet statistics
+    total_subnets = CampusSubnet.objects.count()
+    active_subnets = CampusSubnet.objects.filter(is_active=True).count()
+    inactive_subnets = total_subnets - active_subnets
+    
     recent_sessions = AttendanceSession.objects.select_related(
         'course', 'teacher'
     ).order_by('-start_time')[:10]
@@ -333,6 +342,9 @@ def admin_dashboard(request):
         'total_courses': total_courses,
         'total_students': total_students,
         'total_teachers': total_teachers,
+        'total_subnets': total_subnets,
+        'active_subnets': active_subnets,
+        'inactive_subnets': inactive_subnets,
         'recent_sessions': recent_sessions,
     }
     return render(request, 'attendance/admin_dashboard.html', context)
